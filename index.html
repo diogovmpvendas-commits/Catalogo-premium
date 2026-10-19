@@ -810,6 +810,9 @@ function montarProdutos(linhas){
     if (!nome) return;
     const preco = paraNumero(l.preco !== undefined ? l.preco : (l.valor || l["preço"] || ""));
     const temVar = normalizar(l.variacoes) === "sim" || normalizar(l.variacoes) === "true";
+    const estadoProduto = estadoDisponibilidade(l.disponivel !== undefined ? l.disponivel : (l.ativo || ""));
+    // "nao" na coluna disponivel da aba Produtos: o produto some do catálogo, não importa o que há nas Variacoes
+    if (estadoProduto === "indisponivel") return;
     if (isNaN(preco) && !temVar) return;
 
     const fotos = [l.imagem, l.imagem2, l.imagem3, l.imagem4]
@@ -822,7 +825,7 @@ function montarProdutos(linhas){
       preco: isNaN(preco) ? null : preco,
       fotos: fotos,
       cat: l.categoria || l.tipo || "",
-      estado: estadoDisponibilidade(l.disponivel !== undefined ? l.disponivel : (l.ativo || "")),
+      estado: estadoProduto,
       temVariacoes: temVar,
       selo: normalizar(l.selo),
       destaque: normalizar(l.destaque) === "sim" || normalizar(l.destaque) === "true",
@@ -877,17 +880,33 @@ function filtrar(){
 
 /* ---------- preço conforme a seleção ---------- */
 function combina(v, cor, arm){
-  return (!v.cor || v.cor === cor) && (!v.arm || v.arm === arm);
+  // seleção vazia vale como "qualquer": só filtra pelo que o cliente já escolheu
+  return (!cor || !v.cor || v.cor === cor) && (!arm || !v.arm || v.arm === arm);
+}
+// o que ainda falta o cliente escolher (só conta quando há mais de uma opção a escolher)
+function faltando(p){
+  if (!p.temVariacoes || !p.variacoes.length) return { cor: false, arm: false };
+  const s = p.sel || {};
+  return {
+    cor: !s.cor && opcoesDe(p, "cor").length >= 2,
+    arm: !s.arm && opcoesDe(p, "arm").length >= 2,
+  };
 }
 function precoAtual(p){
   if (!p.temVariacoes || !p.variacoes.length) return { preco: p.preco, estado: p.estado };
-  const cor = (p.sel || {}).cor, arm = (p.sel || {}).arm;
-  const exata = p.variacoes.find(v => combina(v, cor, arm));
-  if (exata) return { preco: exata.preco, estado: exata.estado };
-  const compativeis = p.variacoes.filter(v => combina(v, cor, arm) && v.preco !== null);
-  if (!compativeis.length) return { preco: p.preco, estado: "indisponivel" };
-  const menor = compativeis.reduce((a, b) => (a.preco <= b.preco ? a : b));
-  return { preco: menor.preco, estado: "indisponivel" };
+  const s = p.sel || {};
+  const compat = p.variacoes.filter(v => combina(v, s.cor, s.arm));
+  if (!compat.length) return { preco: p.preco, estado: "indisponivel" };
+  const f = faltando(p);
+  const parcial = f.cor || f.arm;
+  const menor = lista => lista.filter(v => v.preco !== null)
+    .reduce((a, b) => (!a || b.preco < a.preco ? b : a), null);
+  const disp = menor(compat.filter(v => v.estado === "disponivel"));
+  if (disp) return { preco: disp.preco, estado: "disponivel", parcial: parcial };
+  const cons = compat.find(v => v.estado === "consulta");
+  if (cons) return { preco: cons.preco, estado: "consulta", parcial: parcial };
+  const alguma = menor(compat);
+  return { preco: alguma ? alguma.preco : p.preco, estado: "indisponivel", parcial: parcial };
 }
 function opcoesDe(p, campo){
   const outro = campo === "cor" ? (p.sel || {}).arm : (p.sel || {}).cor;
@@ -908,6 +927,8 @@ function opcaoIndisponivel(p, campo, valor){
 }
 function variacaoEscolhida(p){
   if (!p.temVariacoes || !p.variacoes.length) return null;
+  const f = faltando(p);
+  if (f.cor || f.arm) return null;
   return p.variacoes.find(v => combina(v, (p.sel || {}).cor, (p.sel || {}).arm)) || null;
 }
 
@@ -984,7 +1005,7 @@ function card(p){
   const precoHTML = atual.preco === null
     ? '<span class="preco-sob-consulta">Preço sob consulta</span>'
     : '<span class="preco">' + dinheiro(atual.preco) + '</span>' +
-      (p.temVariacoes ? '<span class="preco nota">' + (atual.estado === "disponivel" ? "valor da seleção" : "sujeito a estoque") + '</span>' : '');
+      (p.temVariacoes ? '<span class="preco nota">' + (atual.parcial && atual.estado !== "indisponivel" ? "a partir de · escolha as opções" : (atual.estado === "disponivel" ? "valor da seleção" : "sujeito a estoque")) + '</span>' : '');
 
   const noCarrinho = CARRINHO.some(i => i.chave === chaveItem(p, vSel));
   const podeAdicionar = atual.estado !== "indisponivel" && atual.preco !== null;
@@ -1064,8 +1085,8 @@ function adicionar(p){
     return;
   }
   if (p.temVariacoes){
-    const faltaCor = p.variacoes.some(x => x.cor) && !(p.sel || {}).cor;
-    const faltaArm = p.variacoes.some(x => x.arm) && !(p.sel || {}).arm;
+    const f = faltando(p);
+    const faltaCor = f.cor, faltaArm = f.arm;
     if (faltaCor || faltaArm){
       avisar("Escolha " + [faltaCor ? "a cor" : "", faltaArm ? "o armazenamento" : ""].filter(Boolean).join(" e ") + " para continuar.");
       return;
