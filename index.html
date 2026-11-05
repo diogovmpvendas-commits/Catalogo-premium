@@ -972,7 +972,26 @@ function estadoDisponibilidade(txt){
   return "disponivel";
 }
 function normalizar(txt){
-  return String(txt || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  return String(txt || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+// converte texto da planilha em array de URLs de imagem
+function imagensDaVariacao(txt){
+  if (!txt) return [];
+  return txt.split(/[,;]/)
+    .map(u => linkImagem(u.trim()))
+    .filter(u => u && u.length > 4);
+}
+
+// retorna as fotos atuais do produto (da cor selecionada ou padrão)
+function fotosDoContexto(p){
+  if (!p.temVariacoes) return p.fotos;
+  const e = efetiva(p);
+  if (e.cor){
+    const v = p.variacoes.find(x => x.cor === e.cor);
+    if (v && v.imagens && v.imagens.length) return v.imagens;
+  }
+  return p.fotos;
 }
 
 // leitor de CSV que respeita vírgulas e aspas dentro dos campos
@@ -1231,6 +1250,7 @@ function ligarVariacoes(){
       preco: isNaN(preco) ? null : preco,
       estado: estadoDisponibilidade(v.disponivel),
       codigo: (v.codigo || "").trim(),
+      imagens: imagensDaVariacao(v.imagens || v.imagem),
     });
   });
   // produto marcado com variações mas sem nenhuma linha: usa os dados do próprio produto
@@ -1482,9 +1502,11 @@ function card(p){
   const atual = precoAtual(p);
   const vSel = atual.v;
 
+  const fotos = fotosDoContexto(p);
+
   let miniaturas = "";
-  if (p.fotos.length > 1){
-    miniaturas = '<div class="miniaturas">' + p.fotos.map((_, i) =>
+  if (fotos.length > 1){
+    miniaturas = '<div class="miniaturas">' + fotos.map((_, i) =>
       '<i class="' + (i === 0 ? "on" : "") + '" data-mini="' + i + '"></i>').join("") + '</div>';
   }
 
@@ -1496,8 +1518,8 @@ function card(p){
 
   el.innerHTML =
     '<div class="foto" data-abrir>' +
-      (p.fotos.length
-        ? '<img src="' + esc(p.fotos[0]) + '" alt="' + esc(p.nome) + '" loading="lazy" decoding="async" data-foto="1">'
+      (fotos.length
+        ? '<img src="' + esc(fotos[0]) + '" alt="' + esc(p.nome) + '" loading="lazy" decoding="async" data-foto="1">'
         : '<span class="sem-foto">Sem foto</span>') +
       selosHTML(p) + avisoEstadoHTML(atual) + miniaturas +
     '</div>' +
@@ -1551,7 +1573,7 @@ function pintarFolha(){
   const corpo = $("folha-corpo");
   const topo = corpo.scrollTop;
   const atual = precoAtual(p);
-  const fotos = p.fotos;
+  const fotos = fotosDoContexto(p);
   const iFoto = Math.min(MODAL.foto, Math.max(0, fotos.length - 1));
   MODAL.foto = iFoto;
   const ops = opcionaisDe(p);
@@ -1688,7 +1710,7 @@ function adicionar(p, nomesOpcionais){
     base: atual.preco,
     opcionais: ops,
     preco: atual.preco + soma,
-    img: p.fotos[0] || "",
+    img: fotosDoContexto(p)[0] || "",
     qtd: 1,
   });
 
@@ -1906,10 +1928,11 @@ function falarDoProduto(p){
 }
 
 /* ---------- galeria em tela cheia ---------- */
-let GAL = { produto: null, indice: 0 };
-function abrirGaleria(p, indice){
-  if (!p.fotos.length) return;
-  GAL.produto = p; GAL.indice = indice || 0;
+let GAL = { produto: null, indice: 0, fotos: [] };
+function abrirGaleria(p, indice, fotos){
+  const lista = fotos || p.fotos;
+  if (!lista.length) return;
+  GAL.produto = p; GAL.indice = indice || 0; GAL.fotos = lista;
   $("galeria").classList.add("aberta");
   atualizarTrava();
   pintarGaleria();
@@ -1917,32 +1940,35 @@ function abrirGaleria(p, indice){
 function fecharGaleria(){
   $("galeria").classList.remove("aberta");
   GAL.produto = null;
+  GAL.fotos = [];
   atualizarTrava();
 }
 function mudarFoto(delta){
   const p = GAL.produto;
-  if (!p) return;
-  GAL.indice = (GAL.indice + delta + p.fotos.length) % p.fotos.length;
+  const fotos = GAL.fotos;
+  if (!p || !fotos.length) return;
+  GAL.indice = (GAL.indice + delta + fotos.length) % fotos.length;
   pintarGaleria();
 }
 function pintarGaleria(){
   const p = GAL.produto;
-  if (!p) return;
+  const fotos = GAL.fotos;
+  if (!p || !fotos.length) return;
   const atual = precoAtual(p);
   $("galeria-nome").textContent = p.nome;
   $("galeria-preco").textContent = atual.preco !== null ? (atual.parcial ? "a partir de " : "") + dinheiro(atual.preco) : "Preço sob consulta";
-  $("galeria-contagem").textContent = (GAL.indice + 1) + " / " + p.fotos.length;
+  $("galeria-contagem").textContent = (GAL.indice + 1) + " / " + fotos.length;
   const img = $("galeria-img");
-  img.src = fotoGrande(p.fotos[GAL.indice]);
+  img.src = fotoGrande(fotos[GAL.indice]);
   img.alt = p.nome;
-  $("seta-esquerda").classList.toggle("escondida", p.fotos.length < 2);
-  $("seta-direita").classList.toggle("escondida", p.fotos.length < 2);
+  $("seta-esquerda").classList.toggle("escondida", fotos.length < 2);
+  $("seta-direita").classList.toggle("escondida", fotos.length < 2);
 
   const tiras = $("galeria-tiras");
   tiras.innerHTML = "";
-  if (p.fotos.length < 2){ tiras.style.display = "none"; return; }
+  if (fotos.length < 2){ tiras.style.display = "none"; return; }
   tiras.style.display = "flex";
-  p.fotos.forEach((f, i) => {
+  fotos.forEach((f, i) => {
     const b = document.createElement("button");
     b.className = i === GAL.indice ? "on" : "";
     const im = document.createElement("img");
@@ -2127,7 +2153,7 @@ function avisar(msg){
     if (e.target.closest("#folha-add")){ acaoPrincipalFolha(); return; }
     if (e.target.closest("#folha-zap")){ falarDoProduto(p); return; }
     if (e.target.closest("#folha-share")){ compartilhar(p); return; }
-    if (e.target.closest("[data-gal]") && !MODAL.ignorarToque) abrirGaleria(p, MODAL.foto);
+    if (e.target.closest("[data-gal]") && !MODAL.ignorarToque) abrirGaleria(p, MODAL.foto, fotosDoContexto(p));
   });
   $("folha").addEventListener("change", e => {
     const cx = e.target.closest("[data-op]");
@@ -2219,6 +2245,3 @@ function avisar(msg){
   atualizarGatilho();
   carregar();
 })();
-</script>
-</body>
-</html>
