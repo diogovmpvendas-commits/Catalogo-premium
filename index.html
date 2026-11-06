@@ -8,7 +8,7 @@
 <meta name="description" content="Celulares e acessórios com atendimento pelo WhatsApp. Volta Redonda, RJ.">
 
 <!-- Pré-visualização do link (WhatsApp, Instagram). O endereço da imagem precisa ser completo (https://...).
-     Confira se o endereço abaixo é o do seu GitHub Pages e se o arquivo logo-dg.png está no repositório. -->
+     Confira se o endereço abaixo é do seu GitHub Pages e se o arquivo logo-dg.png está no repositório. -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="DG Imports">
 <meta property="og:locale" content="pt_BR">
@@ -284,6 +284,7 @@ main{max-width:1240px;margin:0 auto;padding:26px 22px 40px}
 .miniaturas i{
   width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.42);
   display:block;transition:background .2s,transform .2s;
+  cursor:pointer;
 }
 .miniaturas i.on{background:var(--ouro);transform:scale(1.25)}
 .selos{position:absolute;top:10px;left:10px;display:flex;flex-direction:column;gap:6px;z-index:2}
@@ -846,7 +847,7 @@ body.com-sacola .assinatura{padding-bottom:92px}
       <p class="titulo-rodape">Atendimento</p>
       <p>Todas as negociações acontecem pelo WhatsApp. Escolha seus produtos, monte o pedido e fale direto com a loja.</p>
       <a class="btn-rodape" id="link-whatsapp-rodape" href="#" target="_blank" rel="noopener">
-        <svg viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm0 18.15c-1.5 0-2.97-.4-4.25-1.16l-.3-.18-3.12.82.83-3.04-.2-.31a8.2 8.2 0 0 1-1.26-4.37c0-4.54 3.7-8.23 8.24-8.23 4.54 0 8.23 3.69 8.23 8.23s-3.69 8.24-8.17 8.24z"/></svg>
+        <svg viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm0 18.15c-1.5 0-2.97-.4-4.25-1.16l-.3-.18-3.12.82.83-3.04-.2-.31a8.2 8.2 0 0 1-1.26-4.37c0-4.54 3.7-8.23 8.24-8.23 4.54 0 8.23 3.69 8.23 8.23s-3.69 8.24-8.17 8.24zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.24-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.38-1.72-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.16.04-.31-.02-.43-.06-.12-.55-1.34-.76-1.83-.2-.48-.4-.42-.55-.42h-.47c-.16 0-.43.06-.65.31-.23.25-.86.84-.86 2.05s.88 2.38 1 2.54c.12.16 1.73 2.65 4.2 3.71.59.25 1.05.4 1.4.51.59.19 1.13.16 1.55.1.47-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.14-1.18-.06-.11-.22-.18-.47-.3z"/></svg>
         Falar com a DG Imports
       </a>
     </div>
@@ -924,7 +925,7 @@ const URL_OPCIONAIS = "";
 
 // Logo: cole aqui o link direto do PNG da logo para usar o arquivo original.
 // Em branco, o catálogo desenha o emblema DG em dourado. Nada quebra.
-const URL_LOGO = "https://drive.google.com/file/d/1AOIMr0uBGYai2Z2edO1qoibqnCTSFf5X/view?usp=sharing";
+const URL_LOGO = "https://diogovmpvendas-commits.github.io/catalogo/logo-dg.png";
 // Reserva: se o link acima falhar, tenta este arquivo do repositório; se também falhar, usa o emblema DG desenhado.
 const URL_LOGO_RESERVA = "logo-dg.png";
 
@@ -972,10 +973,10 @@ function estadoDisponibilidade(txt){
   return "disponivel";
 }
 function normalizar(txt){
-  return String(txt || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return String(txt || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
-// converte texto da planilha em array de URLs de imagem
+// converte texto da planilha em array de URLs de imagem (para coluna imagens na aba Variacoes)
 function imagensDaVariacao(txt){
   if (!txt) return [];
   return txt.split(/[,;]/)
@@ -1501,7 +1502,6 @@ function card(p){
 
   const atual = precoAtual(p);
   const vSel = atual.v;
-
   const fotos = fotosDoContexto(p);
 
   let miniaturas = "";
@@ -1940,7 +1940,6 @@ function abrirGaleria(p, indice, fotos){
 function fecharGaleria(){
   $("galeria").classList.remove("aberta");
   GAL.produto = null;
-  GAL.fotos = [];
   atualizarTrava();
 }
 function mudarFoto(delta){
@@ -2027,7 +2026,7 @@ function pintarResultados(){
   }
   const lista = PRODUTOS.filter(p => bate(p, termo));
   if (!lista.length){
-    box.innerHTML = '<div class="msg-vazia"><b>Nada encontrado para “' + esc(BUSCA) + '”</b>Confira a escrita ou tente só o modelo.</div>';
+    box.innerHTML = '<div class="msg-vazia"><b>Nada encontrado para "' + esc(BUSCA) + '"</b>Confira a escrita ou tente só o modelo.</div>';
     return;
   }
   box.innerHTML = '<p class="busca-dica">' + lista.length + (lista.length === 1 ? " resultado" : " resultados") + '</p>' + lista.map(linhaResultado).join("");
@@ -2168,11 +2167,13 @@ function avisar(msg){
     toqueFx = e.target.closest(".folha-foto") ? e.touches[0].clientX : null;
   }, { passive: true });
   $("folha").addEventListener("touchend", e => {
-    if (toqueFx === null || !MODAL.p || MODAL.p.fotos.length < 2) { toqueFx = null; return; }
+    if (toqueFx === null || !MODAL.p) { toqueFx = null; return; }
+    const fotos = fotosDoContexto(MODAL.p);
+    if (fotos.length < 2) { toqueFx = null; return; }
     const d = e.changedTouches[0].clientX - toqueFx;
     toqueFx = null;
     if (Math.abs(d) > 45){
-      const n = MODAL.p.fotos.length;
+      const n = fotos.length;
       MODAL.foto = (MODAL.foto + (d < 0 ? 1 : -1) + n) % n;
       MODAL.ignorarToque = true;
       pintarFolha();
@@ -2245,3 +2246,6 @@ function avisar(msg){
   atualizarGatilho();
   carregar();
 })();
+</script>
+</body>
+</html>
